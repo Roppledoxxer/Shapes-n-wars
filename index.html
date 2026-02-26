@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Shapes n' Wars — Pro (Original Pieces)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap">
+<style>
+  :root{
+    --bg:#0b0b0c;
+    --panel:#101115;
+    --muted:#9aa0a6;
+    --accent:#ffd166;
+    --light:#eaeaea;
+    --blue:#2979ff;
+    --red:#ff5252;
+    --cell-even:#1e1e22;
+    --cell-odd:#262629;
+    --size:64px;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#050506,#0b0b0c);color:var(--light);-webkit-font-smoothing:antialiased}
+  .app { max-width:1200px; margin:20px auto; display:flex; gap:18px; align-items:flex-start; padding:16px; }
+  .left { flex: 1 1 720px; }
+  .right { width:340px; }
+  .card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; box-shadow: 0 12px 36px rgba(0,0,0,0.6); }
+  header.sitebar { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px; }
+  .brand { display:flex; gap:12px; align-items:center; }
+  .logo { width:46px; height:46px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,var(--accent),#ffb84d); color:#111; font-weight:800; font-size:20px; box-shadow: 0 6px 16px rgba(0,0,0,0.45); }
+  .sitetitle { font-size:18px; font-weight:700; color:var(--light); }
+  .tagline { font-size:12px; color:var(--muted); margin-top:-4px; }
+
+  /* board */
+  .board-wrap{ display:flex; gap:12px; flex-direction:column; align-items:center; }
+  .board {
+    width: calc(var(--size) * 8 + 12px);
+    height: calc(var(--size) * 8 + 12px);
+    display:grid; grid-template-columns: repeat(8, var(--size)); grid-template-rows: repeat(8, var(--size));
+    padding:6px; border-radius:8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02)); box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+  }
+  .cell { width:var(--size); height:var(--size); box-sizing:border-box; display:flex; align-items:center; justify-content:center; border-radius:6px; position:relative; cursor:pointer; user-select:none; transition: all 0.12s ease; }
+  .cell[data-rc="even"]{ background: var(--cell-even); }
+  .cell[data-rc="odd"]{ background: var(--cell-odd); }
+  .cell.highlight { outline:4px solid rgba(255,209,102,0.12); transform:translateY(-2px); }
+  .marker { width:86%; height:86%; display:flex; align-items:center; justify-content:center; position:relative; }
+
+  /* piece base */
+  .piece { pointer-events:none; display:flex; align-items:center; justify-content:center; position:relative; }
+  .piece .shape{ display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+  .piece .label{ position:absolute; bottom:-8px; font-size:11px; color:var(--muted); }
+
+  /* === ORIGINAL PIECE STYLES (copied/adapted) === */
+
+  /* President (star inside circle) */
+  .president .shape{
+    width:44px; height:44px; border-radius:50%; background:linear-gradient(180deg, #fff, #ddd);
+    display:flex; align-items:center; justify-content:center; position:relative; border:2px solid rgba(0,0,0,0.15);
+  }
+  .president .crown{
+    font-size:20px; font-weight:bold; transform: translateY(-1px);
+    color: rgba(0,0,0,0.5);
+  }
+
+  /* Soldier: simple circle */
+  .soldier .shape{
+    width:30px; height:30px; border-radius:50%; background:linear-gradient(180deg,#fff,#ddd);
+    border:2px solid rgba(0,0,0,0.12);
+  }
+
+  /* Tank: circle + barrel (stick) */
+  .tank .shape{
+    width:40px; height:40px; border-radius:50%; position:relative; display:flex;
+    border:3px solid rgba(0,0,0,0.15); background:linear-gradient(180deg,#fff,#e4e4e4);
+    align-items:center; justify-content:center;
+  }
+  .tank .barrel{
+    position:absolute; width:18px; height:5px; border-radius:2px;
+    background: rgb(187, 187, 187); box-shadow:inset 0 -1px 0 rgba(0,0,0,0.15);
+    border:1px solid rgba(0,0,0,0.15);
+  }
+  .tank[data-facing="right"] .barrel { right:-8px; top:50%; transform:translateY(-50%); }
+  .tank[data-facing="left"] .barrel { left:-8px; top:50%; transform:translateY(-50%); }
+  .tank[data-facing="up"] .barrel { top:-8px; left:50%; width:5px; height:18px; transform:translateX(-50%); }
+  .tank[data-facing="down"] .barrel { bottom:-8px; left:50%; width:5px; height:18px; transform:translateX(-50%); }
+
+  /* Artillery: circle with inner dot + barrel */
+  .artillery .shape{
+    width:40px; height:40px; border-radius:50%; position:relative; display:flex;
+    border:3px solid rgba(0,0,0,0.15); background:linear-gradient(180deg,#fff,#e4e4e4);
+    align-items:center; justify-content:center;
+  }
+  .artillery::before{
+    content:""; position:absolute; width:14px; height:14px; border-radius:50%;
+    background:#999; box-shadow:inset 0 -1px 0 rgba(0,0,0,0.2); z-index:2;
+  }
+  .artillery .barrel{
+    position:absolute; width:18px; height:5px; border-radius:2px;
+    background:#bbb; box-shadow:inset 0 -1px 0 rgba(0,0,0,0.15);
+    border:1px solid rgba(0,0,0,0.15);
+  }
+  .artillery[data-facing="right"] .barrel { right:-8px; top:50%; transform:translateY(-50%); }
+  .artillery[data-facing="left"] .barrel { left:-8px; top:50%; transform:translateY(-50%); }
+  .artillery[data-facing="up"] .barrel { top:-8px; left:50%; width:5px; height:18px; transform:translateX(-50%); }
+  .artillery[data-facing="down"] .barrel { bottom:-8px; left:50%; width:5px; height:18px; transform:translateX(-50%); }
+
+  /* Bomber: square */
+  .bomber .shape{
+    width:42px; height:42px; background:linear-gradient(180deg,#fff,#ddd); display:flex;
+    border:3px solid rgba(0,0,0,0.12);
+  }
+
+  /* team tints (keep original tinting behavior) */
+  .team-blue{ filter: drop-shadow(0 2px 4px rgba(41,121,255,0.3)); }
+  .team-red { filter: drop-shadow(0 2px 4px rgba(255,82,82,0.3)); }
+  .blue .shape{ background: linear-gradient(180deg,var(--blue), #448aff); color: #FFF; }
+  .red  .shape{ background: linear-gradient(180deg,var(--red), #ff6b6b); color: #FFF; }
+  .blue.artillery::before { background:#1e56db; }
+  .red.artillery::before { background:#d63e3e; }
+
+  /* controls */
+  .controls { display:flex; gap:8px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+  button { cursor:pointer; background:#111; color:var(--light); border:1px solid rgba(255,255,255,0.04); padding:8px 12px; border-radius:8px; }
+  .btn-primary{ background:linear-gradient(180deg,#222,#101010); border:1px solid rgba(255,255,255,0.04); padding:10px 14px; border-radius:10px; font-weight:700; }
+  .status { margin-top:8px; color:var(--muted); font-weight:600; }
+  .right .card { display:flex; flex-direction:column; gap:8px; }
+  .log { font-family:monospace; font-size:13px; color:var(--muted); overflow:auto; max-height:380px; padding:8px; background:rgba(0,0,0,0.15); border-radius:6px; }
+
+  /* splash */
+  .splash { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:9999; background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.8)); transition: opacity 0.25s ease; }
+  .splash-card { width:820px; max-width:95%; background:linear-gradient(180deg,#0f0f12,#0b0b0c); border-radius:14px; padding:28px; display:flex; gap:20px; align-items:center; box-shadow:0 20px 60px rgba(0,0,0,0.7); }
+  .splash-left { display:flex; flex-direction:column; gap:10px; color:var(--light); }
+
+  @media (max-width:980px){
+    .app{ flex-direction:column; align-items:center; padding:12px; }
+    .right { width:100%; }
+  }
+</style>
+</head>
+<body>
+  <!-- Splash / landing -->
+  <div id="splash" class="splash">
+    <div class="splash-card">
+      <div style="width:120px; display:flex; align-items:center; justify-content:center;"><div class="logo">SNW</div></div>
+      <div style="flex:1;" class="splash-left">
+        <h1>Shapes n' Wars — Pro</h1>
+        <p class="muted">Your original piece artwork has been restored — same visuals as the first version. AI runs in a background worker.</p>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <div class="splash-actions">
+            <button id="splashBlue" class="btn-primary">Play Blue</button>
+            <button id="splashRed" class="btn-primary">Play Red</button>
+          </div>
+          <div style="margin-left:12px">
+            <label style="color:var(--muted); font-size:13px;">AI Strength</label>
+            <select id="splashDifficulty">
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+              <option value="ultra">Ultra</option>
+            </select>
+          </div>
+        </div>
+        <div class="muted" style="margin-top:8px;">Tip: Use the settings in the right panel to tune thinking time.</div>
+      </div>
+      <div style="width:200px; display:flex; flex-direction:column; gap:8px;">
+        <div style="background:linear-gradient(180deg,#0b0b0f,#0a0a0d); padding:12px; border-radius:8px; color:var(--muted);">
+          <div style="font-weight:700; margin-bottom:6px">Overview</div>
+          <div style="font-size:13px;">Capture the enemy President (♛). Protect your own.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <main class="app">
+    <div class="left">
+      <header class="sitebar">
+        <div class="brand">
+          <div class="logo">SNW</div>
+          <div>
+            <div class="sitetitle">Shapes n' Wars</div>
+            <div class="tagline">Original piece visuals • AI in Web Worker</div>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <div class="muted">AI Time</div>
+          <input id="aiTime" type="number" min="50" max="5000" value="800" style="width:90px; padding:6px; border-radius:8px; background:#0b0b0d; color:var(--light); border:1px solid rgba(255,255,255,0.03)">
+          <button id="restartBtn" class="btn-primary">Restart</button>
+        </div>
+      </header>
+
+      <section class="card board-wrap">
+        <div style="display:flex; align-items:center; gap:10px; width:100%; justify-content:space-between;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button id="playBlue" class="btn-primary">Play Blue</button>
+            <button id="playRed" class="btn-primary">Play Red</button>
+            <button id="undoBtn">Undo</button>
+            <button id="hintBtn">Hint</button>
+          </div>
+          <div style="text-align:right;">
+            <div class="status" id="statusText">Choose a side to start</div>
+            <div style="font-size:12px; color:var(--muted);" id="thinkText">AI: idle</div>
+          </div>
+        </div>
+
+        <div id="board" class="board" role="grid" aria-label="Shapes n' Wars board"></div>
+      </section>
+    </div>
+
+    <aside class="right">
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:700">Game Controls</div>
+          <div style="font-size:13px; color:var(--muted)"><span id="evalText">Eval: 0</span></div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="forfeitBtn">Forfeit</button>
+          <button id="exportBtn">Export</button>
+          <button id="importBtn">Import</button>
+        </div>
+
+        <div style="margin-top:12px;">
+          <label style="font-weight:700">Difficulty</label>
+          <select id="difficulty" style="margin-top:6px;">
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="ultra">Ultra</option>
+          </select>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div style="font-weight:700">Move Log</div>
+          <div class="log" id="log"></div>
+        </div>
+
+        <div style="margin-top:12px; color:var(--muted); font-size:13px;">
+          <div><strong>Rules highlight</strong></div>
+          <div>• Tanks/Artillery only captured by Bombers</div>
+          <div>• Bombers only captured by Soldiers</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+<script>
+/* Utilities and core game logic (kept similar to the Pro edition) */
+const BOARD_SIZE = 8;
+function uid(prefix='p'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
+function inBounds(r,c){ return r>=0 && r<BOARD_SIZE && c>=0 && c<BOARD_SIZE; }
+function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+function logMessage(s){ const el = document.getElementById('log'); const d = new Date(); const line = document.createElement('div'); line.textContent = `[${d.getHours()}:${('0'+d.getMinutes()).slice(-2)}] ${s}`; el.prepend(line); if(el.childElementCount>400) el.removeChild(el.lastChild); }
+
+/* Piece creation & start */
+const PIECE_VALUES = { president:10000, tank:500, artillery:500, bomber:400, soldier:100 };
+
+function createPiece(type, team){
+  return { id:uid(type), type, team, moved:false, facing: team==='blue' ? 'down' : 'up', hp:100 };
+}
+
+function emptyBoard(){
+  const b = Array.from({length:BOARD_SIZE}, ()=>Array.from({length:BOARD_SIZE}, ()=>({ terrain:'plain', piece:null })));
+  return b;
+}
+
+function symmetricalStart(){
+  const b = emptyBoard();
+  const back = ['tank','artillery','tank','president','tank','artillery','artillery', null];
+  const bomberCols = [1,3,5];
+
+  for(let c=0;c<8;c++) b[0][c].piece = back[c] ? createPiece(back[c],'red') : null;
+  for(let c=0;c<8;c++) b[2][c].piece = createPiece('soldier','red');
+  for(const col of bomberCols) b[1][col].piece = createPiece('bomber','red');
+
+  for(let c=0;c<8;c++) b[7][c].piece = back[7-c] ? createPiece(back[7-c],'blue') : null;
+  for(let c=0;c<8;c++) b[6][c].piece = createPiece('soldier','blue');
+  for(const col of bomberCols) b[5][7-col].piece = createPiece('bomber','blue');
+
+  return { board:b, turn:'blue', winner:null, turnNumber:1, log:[] };
+}
+
+/* Game state */
+let state = symmetricalStart();
+let playerColor = null;
+let selected = null;
+let legalHighlights = [];
+let history = [];
+
+/* Render using the original visuals */
+function render(){
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  for(let r=0;r<BOARD_SIZE;r++){
+    for(let c=0;c<BOARD_SIZE;c++){
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      const parity = (r+c)%2===0 ? 'even' : 'odd';
+      cell.dataset.rc = parity;
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.id = `cell-${r}-${c}`;
+      const marker = document.createElement('div'); marker.className = 'marker';
+
+      const p = state.board[r][c].piece;
+      if(p){
+        // Build piece element matching original structure
+        const pieceEl = document.createElement('div');
+        // add team tint class (team-blue/team-red) AND team name (blue/red) for CSS selectors
+        const teamClass = p.team === 'blue' ? 'team-blue blue' : 'team-red red';
+        pieceEl.className = `piece ${teamClass} ${p.type}`;
+        pieceEl.dataset.facing = p.facing || 'down';
+
+        const shape = document.createElement('div');
+        shape.className = 'shape';
+
+        // per-piece original decorations
+        if(p.type === 'president'){
+          // circle with crown
+          const crown = document.createElement('div'); crown.className = 'crown'; crown.textContent = '♛';
+          crown.style.fontSize = '22px';
+          crown.style.color = 'rgba(0,0,0,0.5)';
+          shape.appendChild(crown);
+        }
+        if(p.type === 'soldier'){
+          // circle -- style from CSS
+        }
+        if(p.type === 'tank'){
+          // tank: shape + barrel element appended to pieceEl (so barrel positions via [data-facing] work)
+          const barrel = document.createElement('div'); barrel.className = 'barrel';
+          pieceEl.appendChild(barrel);
+        }
+        if(p.type === 'artillery'){
+          // artillery uses ::before in CSS for inner dot; add barrel
+          const barrel = document.createElement('div'); barrel.className = 'barrel';
+          pieceEl.appendChild(barrel);
+        }
+        if(p.type === 'bomber'){
+          // square shape only
+        }
+
+        pieceEl.appendChild(shape);
+        // optional small label (hp) - keep minimal
+        const label = document.createElement('div'); label.className = 'label'; label.textContent = `${Math.max(0,p.hp)}%`;
+        pieceEl.appendChild(label);
+
+        marker.appendChild(pieceEl);
+      }
+
+      cell.appendChild(marker);
+      cell.addEventListener('click', ()=>onCellClick(r,c));
+      boardEl.appendChild(cell);
+    }
+  }
+
+  // reapply highlights
+  legalHighlights.forEach(h=>{
+    const el = document.getElementById(`cell-${h.r}-${h.c}`);
+    if(el) el.classList.add('highlight');
+  });
+
+  // update status and eval
+  const st = document.getElementById('statusText');
+  if(state.winner){
+    st.textContent = state.winner === playerColor ? 'You Win!' : 'You Lose!';
+  } else {
+    const turnText = state.turn === playerColor ? 'Your Turn' : 'AI Thinking...';
+    st.textContent = `${state.turn.toUpperCase()} — ${turnText}`;
+  }
+  document.getElementById('evalText').textContent = `Eval: ${evaluateState(state, playerColor||'blue')}`;
+}
+
+/* Movement rules (kept same) */
+function isCaptureAllowed(attacker, defender){
+  if(!attacker || !defender) return true;
+  if((defender.type === 'tank' || defender.type === 'artillery') && attacker.type !== 'bomber') return false;
+  if(defender.type === 'bomber' && attacker.type !== 'soldier') return false;
+  return true;
+}
+
+function legalMovesFor(piece, r, c, S){
+  const moves = [];
+  if(!piece) return moves;
+  const b = S.board;
+  function pushIf(tr,tc){
+    if(!inBounds(tr,tc)) return;
+    const target = b[tr][tc].piece;
+    if(!target) moves.push({r:tr,c:tc,type:'move'});
+    else if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc,type:'attack'});
+  }
+
+  if(piece.type === 'president' || piece.type === 'soldier'){
+    for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) if(!(dr===0 && dc===0)) pushIf(r+dr,c+dc);
+  } else if(piece.type === 'tank' || piece.type === 'artillery'){
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for(const [dr,dc] of dirs){
+      for(let s=1;s<=5;s++){
+        const tr=r+dr*s, tc=c+dc*s;
+        if(!inBounds(tr,tc)) break;
+        const target = b[tr][tc].piece;
+        if(target){
+          if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc,type:'attack'});
+          break;
+        } else moves.push({r:tr,c:tc,type:'move'});
+      }
+    }
+  } else if(piece.type === 'bomber'){
+    for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++){
+      if(dr===0 && dc===0) continue;
+      for(let s=1;s<=3;s++){
+        const tr=r+dr*s, tc=c+dc*s;
+        if(!inBounds(tr,tc)) break;
+        const target = b[tr][tc].piece;
+        if(target){
+          if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc,type:'attack'});
+          break;
+        } else moves.push({r:tr,c:tc,type:'move'});
+      }
+    }
+  }
+  return moves;
+}
+
+/* Apply move */
+function applyMove(S, from, to){
+  const piece = S.board[from.r][from.c].piece;
+  if(!piece) return S;
+  const target = S.board[to.r][to.c].piece;
+
+  // set facing
+  const dr = to.r - from.r, dc = to.c - from.c;
+  if(Math.abs(dr) > Math.abs(dc)) piece.facing = dr > 0 ? 'down' : 'up';
+  else if(Math.abs(dc) > 0) piece.facing = dc > 0 ? 'right' : 'left';
+
+  if(target && target.team !== piece.team){
+    if(!isCaptureAllowed(piece,target)){
+      console.warn('illegal capture attempted', piece, target);
+      return S;
+    }
+    S.board[to.r][to.c].piece = piece;
+    S.board[from.r][from.c].piece = null;
+    logMessage(`${piece.team} ${piece.type} captured ${target.type} at ${to.r},${to.c}`);
+    if(target.type === 'president') S.winner = piece.team;
+  } else {
+    S.board[to.r][to.c].piece = piece;
+    S.board[from.r][from.c].piece = null;
+    logMessage(`${piece.team} ${piece.type} moved ${from.r},${from.c} → ${to.r},${to.c}`);
+  }
+
+  piece.moved = true;
+  S.turn = S.turn === 'blue' ? 'red' : 'blue';
+  S.turnNumber = (S.turnNumber || 1) + 1;
+  S.log = S.log || [];
+  S.log.push({turn:S.turnNumber, action:`${piece.team} ${piece.type} moved`});
+  return S;
+}
+
+/* Events, splash, worker, etc. */
+document.addEventListener('DOMContentLoaded', ()=>{
+
+  const splash = document.getElementById('splash');
+  const splashBlue = document.getElementById('splashBlue');
+  const splashRed = document.getElementById('splashRed');
+  const splashDiff = document.getElementById('splashDifficulty');
+  const playBlue = document.getElementById('playBlue');
+  const playRed = document.getElementById('playRed');
+  const undoBtn = document.getElementById('undoBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const hintBtn = document.getElementById('hintBtn');
+  const aiTimeInput = document.getElementById('aiTime');
+  const difficultySelect = document.getElementById('difficulty');
+
+  const aiWorker = createAIWorker();
+
+  function hideSplash(){ splash.style.opacity='0'; setTimeout(()=>splash.style.display='none',300); }
+
+  splashBlue.addEventListener('click', ()=>{ playerColor='blue'; hideSplash(); newGame(); aiWorker.postMessage({ cmd:'config', difficulty: splashDiff.value }); });
+  splashRed.addEventListener('click', ()=>{ playerColor='red'; hideSplash(); newGame(); aiWorker.postMessage({ cmd:'config', difficulty: splashDiff.value }); });
+
+  playBlue.addEventListener('click', ()=>{ playerColor='blue'; newGame(); aiWorker.postMessage({ cmd:'config', difficulty: difficultySelect.value }); });
+  playRed.addEventListener('click', ()=>{ playerColor='red'; newGame(); aiWorker.postMessage({ cmd:'config', difficulty: difficultySelect.value }); });
+
+  undoBtn.addEventListener('click', ()=>{ if(history.length){ state = history.pop(); render(); logMessage('Undo'); } else alert('Nothing to undo.'); });
+
+  restartBtn.addEventListener('click', ()=>{ playerColor=null; state=symmetricalStart(); history=[]; render(); document.getElementById('statusText').textContent='Choose a side to start'; });
+
+  hintBtn.addEventListener('click', ()=>{ if(!playerColor) return alert('Choose a side first.'); if(state.turn!==playerColor) return alert('It is not your turn.'); const aiTime = Math.max(100, parseInt(aiTimeInput.value||'300')); aiWorker.postMessage({ cmd:'think', state: clone(state), maxTimeMs: Math.min(500, aiTime), maxDepth:3 }); });
+
+  // worker messages
+  aiWorker.onmessage = (ev)=>{ const data = ev.data; if(!data) return; if(data.cmd==='best'){ const move = data.move; if(!move){ logMessage('AI: no move'); state.winner='draw'; render(); return; } history.push(clone(state)); state = applyMove(clone(state), move.from, move.to); document.getElementById('thinkText').textContent = 'AI: moved'; render(); } else if(data.cmd==='thinking'){ document.getElementById('thinkText').textContent = `AI: thinking (depth ${data.depth})`; } else if(data.cmd==='log'){ logMessage(`[AI] ${data.msg}`); } };
+
+  // board click handler
+  window.onCellClick = onCellClick;
+  render();
+
+  function onCellClick(r,c){
+    if(!playerColor){ alert('Pick a side: Play Blue or Play Red'); return; }
+    if(state.winner) return;
+    if(state.turn !== playerColor) return;
+
+    const p = state.board[r][c].piece;
+    if(selected){
+      const hit = legalHighlights.find(h=>h.r===r && h.c===c);
+      if(hit){
+        history.push(clone(state));
+        state = applyMove(clone(state), {r:selected.r,c:selected.c}, {r,c});
+        selected = null; legalHighlights = [];
+        render();
+        if(!state.winner){
+          const aiTime = Math.max(100, parseInt(aiTimeInput.value || '800'));
+          const depth = difficultySelect.value === 'ultra' ? 6 : (difficultySelect.value === 'hard' ? 5 : 4);
+          document.getElementById('thinkText').textContent = 'AI: thinking...';
+          aiWorker.postMessage({ cmd:'think', state: clone(state), maxTimeMs: aiTime, maxDepth: depth });
+        }
+        return;
+      }
+    }
+
+    if(p && p.team === playerColor){
+      selected = {r,c};
+      legalHighlights = legalMovesFor(p, r, c, state);
+      render();
+    } else {
+      selected = null; legalHighlights = [];
+      render();
+    }
+  }
+
+});
+
+/* Basic evaluation used in UI */
+function evaluateState(S, perspective){
+  if(S.winner){
+    if(S.winner === perspective) return 999999;
+    if(S.winner === 'draw') return 0;
+    return -999999;
+  }
+  let sc = 0;
+  for(let r=0;r<BOARD_SIZE;r++){
+    for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p) continue;
+      const val = PIECE_VALUES[p.type] || 100;
+      sc += (p.team === perspective ? 1 : -1) * val;
+      const centerDist = Math.abs(r-3.5) + Math.abs(c-3.5);
+      sc += (p.team === perspective ? 1 : -1) * ( (3.5 - centerDist) * val * 0.01 );
+    }
+  }
+  return Math.round(sc);
+}
+
+/* Inline AI worker (same core as Pro edition) */
+function createAIWorker(){
+  const workerCode = `
+  const BOARD_SIZE = ${BOARD_SIZE};
+  const PIECE_VALUES = ${JSON.stringify(PIECE_VALUES)};
+  function inBounds(r,c){ return r>=0 && r<BOARD_SIZE && c>=0 && c<BOARD_SIZE; }
+  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
+  function isCaptureAllowed(attacker, defender){
+    if(!attacker || !defender) return true;
+    if((defender.type === 'tank' || defender.type === 'artillery') && attacker.type !== 'bomber') return false;
+    if(defender.type === 'bomber' && attacker.type !== 'soldier') return false;
+    return true;
+  }
+  function generateMoves(S, team){
+    const moves = [];
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p || p.team !== team) continue;
+      const ls = legalMovesFor(p,r,c,S);
+      for(const m of ls) moves.push({from:{r,c}, to:{r:m.r,c:m.c}, piece:p});
+    }
+    return moves;
+  }
+  function legalMovesFor(piece,r,c,S){
+    const moves=[];
+    const b = S.board;
+    function pushIf(tr,tc){ if(!inBounds(tr,tc)) return; const target = b[tr][tc].piece; if(!target) moves.push({r:tr,c:tc}); else if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc}); }
+    if(piece.type === 'president' || piece.type === 'soldier'){
+      for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) if(!(dr===0&&dc===0)) pushIf(r+dr,c+dc);
+    } else if(piece.type === 'tank' || piece.type === 'artillery'){
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for(const [dr,dc] of dirs) for(let s=1;s<=5;s++){ const tr=r+dr*s, tc=c+dc*s; if(!inBounds(tr,tc)) break; const target = b[tr][tc].piece; if(target){ if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc}); break; } else moves.push({r:tr,c:tc}); }
+    } else if(piece.type === 'bomber'){
+      for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++){ if(dr===0 && dc===0) continue; for(let s=1;s<=3;s++){ const tr=r+dr*s, tc=c+dc*s; if(!inBounds(tr,tc)) break; const target = b[tr][tc].piece; if(target){ if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc}); break; } else moves.push({r:tr,c:tc}); } }
+    }
+    return moves;
+  }
+
+  function applyMove(S, move){
+    const s = clone(S);
+    const f = move.from, t = move.to;
+    const piece = s.board[f.r][f.c].piece;
+    if(!piece) return s;
+    const target = s.board[t.r][t.c].piece;
+    if(target && target.team !== piece.team){
+      if(isCaptureAllowed(piece,target)){ s.board[t.r][t.c].piece = piece; s.board[f.r][f.c].piece = null; if(target.type==='president') s.winner = piece.team; }
+    } else { s.board[t.r][t.c].piece = piece; s.board[f.r][f.c].piece = null; }
+    s.turn = s.turn === 'blue' ? 'red' : 'blue';
+    s.turnNumber = (s.turnNumber || 1) + 1;
+    return s;
+  }
+
+  function evaluate(S,perspective){
+    if(S.winner){ if(S.winner === perspective) return 999999; if(S.winner === 'draw') return 0; return -999999; }
+    let sc = 0;
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){ const p = S.board[r][c].piece; if(!p) continue; const v = PIECE_VALUES[p.type] || 100; sc += (p.team===perspective?1:-1)*v; }
+    return sc;
+  }
+
+  const TT = new Map();
+  function negamax(S, depth, alpha, beta, perspective, stopAt){
+    if(Date.now() > stopAt) return evaluate(S,perspective);
+    if(S.winner) return (S.winner === perspective) ? 999999 : -999999;
+    if(depth <= 0) return evaluate(S,perspective);
+    const key = JSON.stringify(S.board) + '|' + S.turn;
+    const tt = TT.get(key); if(tt && tt.depth >= depth) return tt.score;
+    let best = -Infinity;
+    const moves = generateMoves(S, S.turn);
+    moves.sort((a,b)=>{ const ta=S.board[a.to.r][a.to.c].piece; const tb=S.board[b.to.r][b.to.c].piece; const va=ta?(PIECE_VALUES[ta.type]||0):0; const vb=tb?(PIECE_VALUES[tb.type]||0):0; return vb-va; });
+    for(const m of moves){ if(Date.now() > stopAt) break; const s2=applyMove(S,m); const score=-negamax(s2, depth-1, -beta, -alpha, perspective, stopAt); if(score>best) best=score; if(score>alpha) alpha=score; if(alpha>=beta) break; }
+    TT.set(key,{depth,score:best}); return best;
+  }
+
+  self.onmessage = function(ev){
+    const data = ev.data;
+    if(!data) return;
+    if(data.cmd === 'think'){
+      const S = data.state;
+      const maxTime = data.maxTimeMs || 800;
+      const maxDepth = data.maxDepth || 4;
+      const perspective = S.turn;
+      const stopAt = Date.now() + maxTime;
+      let bestMove = null;
+      for(let depth=1; depth<=maxDepth; depth++){
+        postMessage({cmd:'thinking', depth});
+        let bestScore = -Infinity;
+        const moves = generateMoves(S, S.turn);
+        moves.sort((a,b)=>{ const ta=S.board[a.to.r][a.to.c].piece; const tb=S.board[b.to.r][b.to.c].piece; const va=ta?(PIECE_VALUES[ta.type]||0):0; const vb=tb?(PIECE_VALUES[tb.type]||0):0; return vb-va; });
+        for(const m of moves){ if(Date.now() > stopAt) break; const s2 = applyMove(S,m); const score = -negamax(s2, depth-1, -Infinity, Infinity, perspective, stopAt); if(score > bestScore){ bestScore = score; bestMove = m; } }
+        if(Date.now() > stopAt) break;
+      }
+      postMessage({cmd:'best', move: bestMove});
+    } else if(data.cmd === 'config'){
+      postMessage({cmd:'log', msg: 'AI configured: ' + (data.difficulty || 'normal')});
+    }
+  };
+  `;
+  const blob = new Blob([workerCode], { type: 'application/javascript' });
+  const workerUrl = URL.createObjectURL(blob);
+  return new Worker(workerUrl);
+}
+
+/* Boot */
+state = symmetricalStart();
+render();
+logMessage('Ready — choose Play Blue or Play Red. Pieces match original visuals.');
+
+</script>
+</body>
+</html>
