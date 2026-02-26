@@ -1,0 +1,30 @@
+<!-- tank-favicon.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- blue team gradient (same as your .blue .shape) -->
+    <linearGradient id="tankGrad" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#2979ff"/>
+      <stop offset="1" stop-color="#448aff"/>
+    </linearGradient>
+
+    <!-- tiny inner shadow to emulate inset -->
+    <filter id="inner" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.2" result="b"/>
+      <feOffset dy="0.6" result="o"/>
+      <feComposite in="SourceGraphic" in2="o" operator="over"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#inner)">
+    <!-- main round body -->
+    <circle cx="32" cy="32" r="18"
+            fill="url(#tankGrad)"
+            stroke="rgba(0,0,0,0.15)"
+            stroke-width="2"/>
+    <!-- barrel sticking out to the right -->
+    <rect x="42" y="29.5" width="18" height="5" rx="2.5"
+          fill="url(#tankGrad)"
+          stroke="rgba(0,0,0,0.15)"
+          stroke-width="1"/>
+  </g>
+</svg>
