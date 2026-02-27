@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Shapes n' Wars — Pro (Original Pieces)</title>
+<title>Shapes n' Wars</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap">
 <link rel="icon" href="tank-favicon.svg" type="image/svg+xml">
 <style>
@@ -145,7 +145,7 @@
       <div style="width:120px; display:flex; align-items:center; justify-content:center;"><div class="logo">SNW</div></div>
       <div style="flex:1;" class="splash-left">
         <h1>Shapes n' Wars — Pro</h1>
-        <p class="muted">Your original piece artwork has been restored — same visuals as the first version. AI runs in a background worker.</p>
+        <p class="muted">Shapes n' Wars is a browser game that's based off of chess, but easier.</p>
         <div style="display:flex; gap:12px; align-items:center;">
           <div class="splash-actions">
             <button id="splashBlue" class="btn-primary">Play Blue</button>
@@ -546,7 +546,7 @@ function evaluateState(S, perspective){
   return Math.round(sc);
 }
 
-/* Inline AI worker (same core as Pro edition) */
+/* Replacement createAIWorker() - drop in for your script */
 function createAIWorker(){
   const workerCode = `
   const BOARD_SIZE = ${BOARD_SIZE};
@@ -559,16 +559,22 @@ function createAIWorker(){
     if(defender.type === 'bomber' && attacker.type !== 'soldier') return false;
     return true;
   }
+
+  // --- generate moves with type info (move / attack) ---
   function generateMoves(S, team){
     const moves = [];
     for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
       const p = S.board[r][c].piece;
       if(!p || p.team !== team) continue;
       const ls = legalMovesFor(p,r,c,S);
-      for(const m of ls) moves.push({from:{r,c}, to:{r:m.r,c:m.c}, piece:p});
+      for(const m of ls){
+        const target = S.board[m.r][m.c].piece;
+        moves.push({from:{r,c}, to:{r:m.r,c:m.c}, piece: p, type: target ? 'attack' : 'move', targetType: target ? target.type : null});
+      }
     }
     return moves;
   }
+
   function legalMovesFor(piece,r,c,S){
     const moves=[];
     const b = S.board;
@@ -584,6 +590,7 @@ function createAIWorker(){
     return moves;
   }
 
+  // apply move (non-destructive clone outside)
   function applyMove(S, move){
     const s = clone(S);
     const f = move.from, t = move.to;
@@ -598,27 +605,97 @@ function createAIWorker(){
     return s;
   }
 
+  // evaluate similar to original but made a little richer: value + positional + vulnerability weighting
   function evaluate(S,perspective){
     if(S.winner){ if(S.winner === perspective) return 999999; if(S.winner === 'draw') return 0; return -999999; }
     let sc = 0;
-    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){ const p = S.board[r][c].piece; if(!p) continue; const v = PIECE_VALUES[p.type] || 100; sc += (p.team===perspective?1:-1)*v; }
-    return sc;
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p) continue;
+      const base = PIECE_VALUES[p.type] || 100;
+      // center proximity bonus (small)
+      const centerDist = Math.abs(r-3.5) + Math.abs(c-3.5);
+      const posBonus = ((3.5 - centerDist) * base * 0.01);
+      let v = base + posBonus;
+      // penalize pieces that are undefended (vulnerable) from the perspective of their owner
+      if(isSquareDefended(S, r, c) === false){
+        v *= 0.92; // slightly less valuable if unprotected (opponent can take advantage)
+      }
+      sc += (p.team === perspective ? 1 : -1) * v;
+    }
+    return Math.round(sc);
   }
 
+  // quick table for transposition caching
   const TT = new Map();
+
+  // check if a square (r,c) currently containing a piece is defended by any friendly piece
+  function isSquareDefended(S, r, c){
+    const occupant = S.board[r][c].piece;
+    if(!occupant) return false; // nothing to defend
+    const team = occupant.team;
+    // iterate all friendly pieces, see if any legal move attacks this square
+    for(let rr=0; rr<BOARD_SIZE; rr++){
+      for(let cc=0; cc<BOARD_SIZE; cc++){
+        const p = S.board[rr][cc].piece;
+        if(!p || p.team !== team) continue;
+        const moves = legalMovesFor(p, rr, cc, S);
+        for(const m of moves){
+          if(m.r === r && m.c === c){
+            // ensure capture is allowed (we already filtered in legalMovesFor)
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  // check if after making 'move' (which may be a capture), the moved piece would be recaptured on that square by opponent
+  function wouldBeRecapturedAfter(S, move){
+    const s2 = applyMove(S, move);
+    // find destination coordinates
+    const tr = move.to.r, tc = move.to.c;
+    const opp = s2.turn; // after applyMove, turn has switched to opponent
+    const oppMoves = generateMoves(s2, opp);
+    for(const om of oppMoves){
+      if(om.to.r === tr && om.to.c === tc){
+        return true; // opponent can recapture
+      }
+    }
+    return false;
+  }
+
+  // negamax with timeout
   function negamax(S, depth, alpha, beta, perspective, stopAt){
     if(Date.now() > stopAt) return evaluate(S,perspective);
     if(S.winner) return (S.winner === perspective) ? 999999 : -999999;
     if(depth <= 0) return evaluate(S,perspective);
-    const key = JSON.stringify(S.board) + '|' + S.turn;
+    const key = JSON.stringify(S.board) + '|' + S.turn + '|' + depth;
     const tt = TT.get(key); if(tt && tt.depth >= depth) return tt.score;
     let best = -Infinity;
     const moves = generateMoves(S, S.turn);
-    moves.sort((a,b)=>{ const ta=S.board[a.to.r][a.to.c].piece; const tb=S.board[b.to.r][b.to.c].piece; const va=ta?(PIECE_VALUES[ta.type]||0):0; const vb=tb?(PIECE_VALUES[tb.type]||0):0; return vb-va; });
-    for(const m of moves){ if(Date.now() > stopAt) break; const s2=applyMove(S,m); const score=-negamax(s2, depth-1, -beta, -alpha, perspective, stopAt); if(score>best) best=score; if(score>alpha) alpha=score; if(alpha>=beta) break; }
-    TT.set(key,{depth,score:best}); return best;
+    // order moves heuristically by capture value (MVV-LVA style)
+    moves.sort((a,b)=>{
+      const ta = S.board[a.to.r][a.to.c].piece;
+      const tb = S.board[b.to.r][b.to.c].piece;
+      const va = ta ? (PIECE_VALUES[ta.type]||0) : 0;
+      const vb = tb ? (PIECE_VALUES[tb.type]||0) : 0;
+      return (vb - va);
+    });
+    for(const m of moves){
+      if(Date.now() > stopAt) break;
+      const s2 = applyMove(S, m);
+      const score = -negamax(s2, depth-1, -beta, -alpha, perspective, stopAt);
+      if(score>best) best=score;
+      if(score>alpha) alpha=score;
+      if(alpha>=beta) break;
+    }
+    TT.set(key,{depth,score:best});
+    return best;
   }
 
+  // Main 'think' handler: search with additional heuristics so AI attacks more and prefers unprotected captures
   self.onmessage = function(ev){
     const data = ev.data;
     if(!data) return;
@@ -626,19 +703,90 @@ function createAIWorker(){
       const S = data.state;
       const maxTime = data.maxTimeMs || 800;
       const maxDepth = data.maxDepth || 4;
-      const perspective = S.turn;
+      const perspective = S.turn; // AI's side to move
       const stopAt = Date.now() + maxTime;
       let bestMove = null;
+      let bestScoreGlobal = -Infinity;
+
+      // aggression parameters (tune these)
+      const CAPTURE_BONUS = 200;       // base bonus for making a capture
+      const SAFE_CAPTURE_BONUS = 120;  // extra bonus if capture is not recapturable
+      const UNPROTECTED_TARGET_BONUS = 90; // additional boost if target is unprotected now
+
+      // get candidate moves once
+      const rootMoves = generateMoves(S, S.turn);
+      if(rootMoves.length === 0){
+        postMessage({cmd:'best', move: null});
+        return;
+      }
+
       for(let depth=1; depth<=maxDepth; depth++){
         postMessage({cmd:'thinking', depth});
-        let bestScore = -Infinity;
-        const moves = generateMoves(S, S.turn);
-        moves.sort((a,b)=>{ const ta=S.board[a.to.r][a.to.c].piece; const tb=S.board[b.to.r][b.to.c].piece; const va=ta?(PIECE_VALUES[ta.type]||0):0; const vb=tb?(PIECE_VALUES[tb.type]||0):0; return vb-va; });
-        for(const m of moves){ if(Date.now() > stopAt) break; const s2 = applyMove(S,m); const score = -negamax(s2, depth-1, -Infinity, Infinity, perspective, stopAt); if(score > bestScore){ bestScore = score; bestMove = m; } }
+        let bestMoveAtDepth = null;
+        let bestScoreAtDepth = -Infinity;
+
+        // sort root moves with a heuristic that prefers attacks to unprotected/high-value targets
+        rootMoves.sort((a,b)=>{
+          const ta = S.board[a.to.r][a.to.c].piece;
+          const tb = S.board[b.to.r][b.to.c].piece;
+          const va = ta ? (PIECE_VALUES[ta.type]||0) : 0;
+          const vb = tb ? (PIECE_VALUES[tb.type]||0) : 0;
+          let scoreA = (a.type === 'attack') ? va : 0;
+          let scoreB = (b.type === 'attack') ? vb : 0;
+          // reward attacking unprotected targets now
+          if(a.type === 'attack'){
+            const unprotectedA = !isSquareDefended(S, a.to.r, a.to.c);
+            if(unprotectedA) scoreA += UNPROTECTED_TARGET_BONUS;
+          }
+          if(b.type === 'attack'){
+            const unprotectedB = !isSquareDefended(S, b.to.r, b.to.c);
+            if(unprotectedB) scoreB += UNPROTECTED_TARGET_BONUS;
+          }
+          return scoreB - scoreA;
+        });
+
+        for(const m of rootMoves){
+          if(Date.now() > stopAt) break;
+
+          // quick heuristic score for move desirability (before deep search)
+          let heuristic = 0;
+          if(m.type === 'attack'){
+            const targetVal = PIECE_VALUES[m.targetType] || 100;
+            heuristic += CAPTURE_BONUS + targetVal;
+            // if the destination is currently unprotected, favor it strongly
+            if(!isSquareDefended(S, m.to.r, m.to.c)) heuristic += UNPROTECTED_TARGET_BONUS;
+            // if capturing will NOT allow immediate recapture, award a safety bonus
+            if(!wouldBeRecapturedAfter(S, m)) heuristic += SAFE_CAPTURE_BONUS;
+            else heuristic -= 30; // discourage obviously losing trades
+          } else {
+            // for non-capture moves, small bias to move toward center / aggression
+            const centerDist = Math.abs(m.to.r - 3.5) + Math.abs(m.to.c - 3.5);
+            heuristic += Math.max(0, (3.5 - centerDist)) * 6;
+          }
+
+          // run search from resulting position
+          const s2 = applyMove(S, m);
+          const score = -negamax(s2, depth-1, -Infinity, Infinity, perspective, stopAt);
+
+          // combine deep score and heuristic (heuristic breaks ties and encourages aggression)
+          const combined = score + heuristic;
+
+          if(combined > bestScoreAtDepth){
+            bestScoreAtDepth = combined;
+            bestMoveAtDepth = m;
+          }
+        }
+
         if(Date.now() > stopAt) break;
+        if(bestMoveAtDepth && bestScoreAtDepth > bestScoreGlobal){
+          bestScoreGlobal = bestScoreAtDepth;
+          bestMove = bestMoveAtDepth;
+        }
       }
+
       postMessage({cmd:'best', move: bestMove});
     } else if(data.cmd === 'config'){
+      // optional difficulty / config feedback
       postMessage({cmd:'log', msg: 'AI configured: ' + (data.difficulty || 'normal')});
     }
   };
