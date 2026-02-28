@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Shapes n' Wars</title>
+<title>Shapes n' Wars — Advanced AI</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap">
 <link rel="icon" href="tank-favicon.svg" type="image/svg+xml">
 <style>
@@ -43,7 +43,7 @@
   .cell { width:var(--size); height:var(--size); box-sizing:border-box; display:flex; align-items:center; justify-content:center; border-radius:6px; position:relative; cursor:pointer; user-select:none; transition: all 0.12s ease; }
   .cell[data-rc="even"]{ background: var(--cell-even); }
   .cell[data-rc="odd"]{ background: var(--cell-odd); }
-  .cell.highlight { outline:4px solid rgba(255,209,102,0.12); transform:translateY(-2px); }
+  .cell.highlight { outline:4px solid rgba(255,209,102,0.18); transform:translateY(-2px); }
   .marker { width:86%; height:86%; display:flex; align-items:center; justify-content:center; position:relative; }
 
   /* piece base */
@@ -144,8 +144,8 @@
     <div class="splash-card">
       <div style="width:120px; display:flex; align-items:center; justify-content:center;"><div class="logo">SNW</div></div>
       <div style="flex:1;" class="splash-left">
-        <h1>Shapes n' Wars — Pro</h1>
-        <p class="muted">Shapes n' Wars is a browser game that's based off of chess, but easier.</p>
+        <h1>Shapes n' Wars — Pro (Advanced AI)</h1>
+        <p class="muted">Shapes n' Wars — now with a stronger, safety-aware AI that hunts the President.</p>
         <div style="display:flex; gap:12px; align-items:center;">
           <div class="splash-actions">
             <button id="splashBlue" class="btn-primary">Play Blue</button>
@@ -160,7 +160,7 @@
             </select>
           </div>
         </div>
-        <div class="muted" style="margin-top:8px;">Tip: Use the settings in the right panel to tune thinking time.</div>
+        <div class="muted" style="margin-top:8px;">Tip: Increase AI Time for deeper search.</div>
       </div>
       <div style="width:200px; display:flex; flex-direction:column; gap:8px;">
         <div style="background:linear-gradient(180deg,#0b0b0f,#0a0a0d); padding:12px; border-radius:8px; color:var(--muted);">
@@ -182,8 +182,8 @@
           </div>
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
-          <div class="muted">AI Time</div>
-          <input id="aiTime" type="number" min="50" max="5000" value="800" style="width:90px; padding:6px; border-radius:8px; background:#0b0b0d; color:var(--light); border:1px solid rgba(255,255,255,0.03)">
+          <div class="muted">AI Time (ms)</div>
+          <input id="aiTime" type="number" min="50" max="10000" value="1200" style="width:90px; padding:6px; border-radius:8px; background:#0b0b0d; color:var(--light); border:1px solid rgba(255,255,255,0.03)">
           <button id="restartBtn" class="btn-primary">Restart</button>
         </div>
       </header>
@@ -215,8 +215,6 @@
 
         <div style="display:flex; gap:8px; margin-top:8px;">
           <button id="forfeitBtn">Forfeit</button>
-          <button id="exportBtn">Export</button>
-          <button id="importBtn">Import</button>
         </div>
 
         <div style="margin-top:12px;">
@@ -243,7 +241,7 @@
   </main>
 
 <script>
-/* Utilities and core game logic (kept similar to the Pro edition) */
+/* ---------- Core UI/Game (kept similar) ---------- */
 const BOARD_SIZE = 8;
 function uid(prefix='p'){ return prefix + '_' + Math.random().toString(36).slice(2,9); }
 function inBounds(r,c){ return r>=0 && r<BOARD_SIZE && c>=0 && c<BOARD_SIZE; }
@@ -303,7 +301,6 @@ function render(){
       if(p){
         // Build piece element matching original structure
         const pieceEl = document.createElement('div');
-        // add team tint class (team-blue/team-red) AND team name (blue/red) for CSS selectors
         const teamClass = p.team === 'blue' ? 'team-blue blue' : 'team-red red';
         pieceEl.className = `piece ${teamClass} ${p.type}`;
         pieceEl.dataset.facing = p.facing || 'down';
@@ -311,33 +308,22 @@ function render(){
         const shape = document.createElement('div');
         shape.className = 'shape';
 
-        // per-piece original decorations
         if(p.type === 'president'){
-          // circle with crown
           const crown = document.createElement('div'); crown.className = 'crown'; crown.textContent = '♛';
           crown.style.fontSize = '22px';
           crown.style.color = 'rgba(0,0,0,0.5)';
           shape.appendChild(crown);
         }
-        if(p.type === 'soldier'){
-          // circle -- style from CSS
-        }
         if(p.type === 'tank'){
-          // tank: shape + barrel element appended to pieceEl (so barrel positions via [data-facing] work)
           const barrel = document.createElement('div'); barrel.className = 'barrel';
           pieceEl.appendChild(barrel);
         }
         if(p.type === 'artillery'){
-          // artillery uses ::before in CSS for inner dot; add barrel
           const barrel = document.createElement('div'); barrel.className = 'barrel';
           pieceEl.appendChild(barrel);
         }
-        if(p.type === 'bomber'){
-          // square shape only
-        }
 
         pieceEl.appendChild(shape);
-        // optional small label (hp) - keep minimal
         const label = document.createElement('div'); label.className = 'label'; label.textContent = `${Math.max(0,p.hp)}%`;
         pieceEl.appendChild(label);
 
@@ -350,13 +336,11 @@ function render(){
     }
   }
 
-  // reapply highlights
   legalHighlights.forEach(h=>{
     const el = document.getElementById(`cell-${h.r}-${h.c}`);
     if(el) el.classList.add('highlight');
   });
 
-  // update status and eval
   const st = document.getElementById('statusText');
   if(state.winner){
     st.textContent = state.winner === playerColor ? 'You Win!' : 'You Lose!';
@@ -367,7 +351,7 @@ function render(){
   document.getElementById('evalText').textContent = `Eval: ${evaluateState(state, playerColor||'blue')}`;
 }
 
-/* Movement rules (kept same) */
+/* Movement rules (same) */
 function isCaptureAllowed(attacker, defender){
   if(!attacker || !defender) return true;
   if((defender.type === 'tank' || defender.type === 'artillery') && attacker.type !== 'bomber') return false;
@@ -424,7 +408,6 @@ function applyMove(S, from, to){
   if(!piece) return S;
   const target = S.board[to.r][to.c].piece;
 
-  // set facing
   const dr = to.r - from.r, dc = to.c - from.c;
   if(Math.abs(dr) > Math.abs(dc)) piece.facing = dr > 0 ? 'down' : 'up';
   else if(Math.abs(dc) > 0) piece.facing = dc > 0 ? 'right' : 'left';
@@ -481,7 +464,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   restartBtn.addEventListener('click', ()=>{ playerColor=null; state=symmetricalStart(); history=[]; render(); document.getElementById('statusText').textContent='Choose a side to start'; });
 
-  hintBtn.addEventListener('click', ()=>{ if(!playerColor) return alert('Choose a side first.'); if(state.turn!==playerColor) return alert('It is not your turn.'); const aiTime = Math.max(100, parseInt(aiTimeInput.value||'300')); aiWorker.postMessage({ cmd:'think', state: clone(state), maxTimeMs: Math.min(500, aiTime), maxDepth:3 }); });
+  hintBtn.addEventListener('click', ()=>{ if(!playerColor) return alert('Choose a side first.'); if(state.turn!==playerColor) return alert('It is not your turn.'); const aiTime = Math.max(100, parseInt(aiTimeInput.value||'300')); aiWorker.postMessage({ cmd:'think', state: clone(state), maxTimeMs: Math.min(2000, aiTime), maxDepth:3 }); });
 
   // worker messages
   aiWorker.onmessage = (ev)=>{ const data = ev.data; if(!data) return; if(data.cmd==='best'){ const move = data.move; if(!move){ logMessage('AI: no move'); state.winner='draw'; render(); return; } history.push(clone(state)); state = applyMove(clone(state), move.from, move.to); document.getElementById('thinkText').textContent = 'AI: moved'; render(); } else if(data.cmd==='thinking'){ document.getElementById('thinkText').textContent = `AI: thinking (depth ${data.depth})`; } else if(data.cmd==='log'){ logMessage(`[AI] ${data.msg}`); } };
@@ -504,8 +487,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
         selected = null; legalHighlights = [];
         render();
         if(!state.winner){
-          const aiTime = Math.max(100, parseInt(aiTimeInput.value || '800'));
-          const depth = difficultySelect.value === 'ultra' ? 6 : (difficultySelect.value === 'hard' ? 5 : 4);
+          const aiTime = Math.max(100, parseInt(aiTimeInput.value || '1200'));
+          const depth = difficultySelect.value === 'ultra' ? 7 : (difficultySelect.value === 'hard' ? 6 : 5);
           document.getElementById('thinkText').textContent = 'AI: thinking...';
           aiWorker.postMessage({ cmd:'think', state: clone(state), maxTimeMs: aiTime, maxDepth: depth });
         }
@@ -525,7 +508,7 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
 });
 
-/* Basic evaluation used in UI */
+/* Basic evaluation used in UI (keeps old evaluation for UI quick read) */
 function evaluateState(S, perspective){
   if(S.winner){
     if(S.winner === perspective) return 999999;
@@ -546,13 +529,13 @@ function evaluateState(S, perspective){
   return Math.round(sc);
 }
 
-/* Replacement createAIWorker() - drop in for your script */
+/* ---------- Advanced AI Worker (very large block) ---------- */
 function createAIWorker(){
   const workerCode = `
   const BOARD_SIZE = ${BOARD_SIZE};
   const PIECE_VALUES = ${JSON.stringify(PIECE_VALUES)};
+  function clone(x){ return JSON.parse(JSON.stringify(x)); }
   function inBounds(r,c){ return r>=0 && r<BOARD_SIZE && c>=0 && c<BOARD_SIZE; }
-  function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
   function isCaptureAllowed(attacker, defender){
     if(!attacker || !defender) return true;
     if((defender.type === 'tank' || defender.type === 'artillery') && attacker.type !== 'bomber') return false;
@@ -560,27 +543,13 @@ function createAIWorker(){
     return true;
   }
 
-  // --- generate moves with type info (move / attack) ---
-  function generateMoves(S, team){
-    const moves = [];
-    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
-      const p = S.board[r][c].piece;
-      if(!p || p.team !== team) continue;
-      const ls = legalMovesFor(p,r,c,S);
-      for(const m of ls){
-        const target = S.board[m.r][m.c].piece;
-        moves.push({from:{r,c}, to:{r:m.r,c:m.c}, piece: p, type: target ? 'attack' : 'move', targetType: target ? target.type : null});
-      }
-    }
-    return moves;
-  }
-
+  // --- Move generation (keeps same rules) ---
   function legalMovesFor(piece,r,c,S){
     const moves=[];
     const b = S.board;
     function pushIf(tr,tc){ if(!inBounds(tr,tc)) return; const target = b[tr][tc].piece; if(!target) moves.push({r:tr,c:tc}); else if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc}); }
     if(piece.type === 'president' || piece.type === 'soldier'){
-      for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) if(!(dr===0&&dc===0)) pushIf(r+dr,c+dc);
+      for(let dr=-1; dr<=1; dr++) for(let dc=-1; dc<=1; dc++) if(!(dr===0 && dc===0)) pushIf(r+dr,c+dc);
     } else if(piece.type === 'tank' || piece.type === 'artillery'){
       const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
       for(const [dr,dc] of dirs) for(let s=1;s<=5;s++){ const tr=r+dr*s, tc=c+dc*s; if(!inBounds(tr,tc)) break; const target = b[tr][tc].piece; if(target){ if(target.team !== piece.team && isCaptureAllowed(piece,target)) moves.push({r:tr,c:tc}); break; } else moves.push({r:tr,c:tc}); }
@@ -590,7 +559,21 @@ function createAIWorker(){
     return moves;
   }
 
-  // apply move (non-destructive clone outside)
+  function generateMoves(S, team){
+    const all = [];
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p || p.team !== team) continue;
+      const movs = legalMovesFor(p, r, c, S);
+      for(const m of movs){
+        const target = S.board[m.r][m.c].piece;
+        all.push({ from:{r,c}, to:{r:m.r,c:m.c}, piece: p, type: target ? 'attack' : 'move', targetType: target ? target.type : null });
+      }
+    }
+    return all;
+  }
+
+  // Apply move (non-destructive)
   function applyMove(S, move){
     const s = clone(S);
     const f = move.from, t = move.to;
@@ -605,192 +588,291 @@ function createAIWorker(){
     return s;
   }
 
-  // evaluate similar to original but made a little richer: value + positional + vulnerability weighting
-  function evaluate(S,perspective){
-    if(S.winner){ if(S.winner === perspective) return 999999; if(S.winner === 'draw') return 0; return -999999; }
-    let sc = 0;
+  // Helper: find coordinates of team president
+  function findPresident(S, team){
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(p && p.team === team && p.type === 'president') return {r,c};
+    }
+    return null;
+  }
+
+  // Compute attacked/defended counts for all squares (fast-ish)
+  function buildAttackMap(S){
+    const attacked = Array.from({length:BOARD_SIZE}, ()=>Array.from({length:BOARD_SIZE}, ()=>([])));
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p) continue;
+      const moves = legalMovesFor(p, r, c, S);
+      for(const m of moves){
+        attacked[m.r][m.c].push({by:p.team, piece:p, from:{r,c}});
+      }
+    }
+    return attacked;
+  }
+
+  // Quiescence search (captures only)
+  function quiesce(S, alpha, beta, perspective, stopAt, tt){
+    if(Date.now() > stopAt) return evaluate(S, perspective);
+    if(S.winner) return S.winner === perspective ? 999999 : -999999;
+    // stand pat
+    let stand = evaluate(S, perspective);
+    if(stand >= beta) return stand;
+    if(alpha < stand) alpha = stand;
+
+    // generate capturing moves only
+    const moves = generateMoves(S, S.turn).filter(m => m.type === 'attack');
+    // order by MVV-LVA
+    moves.sort((a,b)=>{
+      const va = (a.targetType && PIECE_VALUES[a.targetType]) || 0;
+      const vb = (b.targetType && PIECE_VALUES[b.targetType]) || 0;
+      return vb - va;
+    });
+
+    for(const m of moves){
+      if(Date.now() > stopAt) break;
+      const s2 = applyMove(S, m);
+      const score = -quiesce(s2, -beta, -alpha, perspective, stopAt, tt);
+      if(score >= beta) return score;
+      if(score > alpha) alpha = score;
+    }
+    return alpha;
+  }
+
+  // Static evaluation: material + mobility + safety + president threat
+  function evaluate(S, perspective){
+    if(S.winner){
+      if(S.winner === perspective) return 999999;
+      if(S.winner === 'draw') return 0;
+      return -999999;
+    }
+
+    // material and base
+    let score = 0;
     for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
       const p = S.board[r][c].piece;
       if(!p) continue;
       const base = PIECE_VALUES[p.type] || 100;
-      // center proximity bonus (small)
+      // activity: prefer forward/centered pieces
       const centerDist = Math.abs(r-3.5) + Math.abs(c-3.5);
       const posBonus = ((3.5 - centerDist) * base * 0.01);
-      let v = base + posBonus;
-      // penalize pieces that are undefended (vulnerable) from the perspective of their owner
-      if(isSquareDefended(S, r, c) === false){
-        v *= 0.92; // slightly less valuable if unprotected (opponent can take advantage)
-      }
-      sc += (p.team === perspective ? 1 : -1) * v;
+      score += (p.team === perspective ? 1 : -1) * (base + posBonus);
     }
-    return Math.round(sc);
+
+    // mobility: number of moves
+    const myMoves = generateMoves(S, perspective).length;
+    const oppMoves = generateMoves(S, perspective === 'blue' ? 'red' : 'blue').length;
+    score += (myMoves - oppMoves) * 8;
+
+    // attacked/defended map and vulnerability penalty
+    const attacked = buildAttackMap(S);
+    for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+      const p = S.board[r][c].piece;
+      if(!p) continue;
+      const list = attacked[r][c] || [];
+      const attackers = list.filter(x=>x.by !== p.team).length;
+      const defenders = list.filter(x=>x.by === p.team).length;
+      if(attackers > 0 && defenders === 0){
+        // hanging piece penalty proportional to its value and attackers
+        const penalty = (PIECE_VALUES[p.type] || 100) * 0.22 * attackers;
+        score += (p.team === perspective ? -penalty : penalty);
+      } else if(attackers > 0 && defenders > 0){
+        // prefer having defenders
+        const value = (PIECE_VALUES[p.type] || 100);
+        const safetyBonus = Math.min(1.0, defenders/attackers) * value * 0.06;
+        score += (p.team === perspective ? safetyBonus : -safetyBonus);
+      }
+    }
+
+    // President safety: penalize being attacked / reward attacking opponent president
+    const myPres = findPresident(S, perspective);
+    const oppPres = findPresident(S, perspective === 'blue' ? 'red' : 'blue');
+    if(myPres){
+      const myAtks = (attacked[myPres.r][myPres.c]||[]).filter(x=>x.by !== perspective).length;
+      if(myAtks > 0) score -= 2000 * myAtks; // strong penalty per attacker on my president
+    }
+    if(oppPres){
+      const oppAtks = (attacked[oppPres.r][oppPres.c]||[]).filter(x=>x.by === perspective).length;
+      if(oppAtks > 0) score += 2000 * oppAtks; // reward for having attackers on opponent president
+      // extra proximity incentive
+      // compute min distance from any of my pieces to oppPres
+      let minDist = 100;
+      for(let r=0;r<BOARD_SIZE;r++) for(let c=0;c<BOARD_SIZE;c++){
+        const p = S.board[r][c].piece;
+        if(!p || p.team !== perspective) continue;
+        const d = Math.abs(r-oppPres.r) + Math.abs(c-oppPres.c);
+        if(d < minDist) minDist = d;
+      }
+      if(minDist < 100) score += Math.max(0, (6 - minDist)) * 50;
+    }
+
+    return Math.round(score);
   }
 
-  // quick table for transposition caching
+  // Transposition table (simple)
   const TT = new Map();
 
-  // check if a square (r,c) currently containing a piece is defended by any friendly piece
-  function isSquareDefended(S, r, c){
-    const occupant = S.board[r][c].piece;
-    if(!occupant) return false; // nothing to defend
-    const team = occupant.team;
-    // iterate all friendly pieces, see if any legal move attacks this square
-    for(let rr=0; rr<BOARD_SIZE; rr++){
-      for(let cc=0; cc<BOARD_SIZE; cc++){
-        const p = S.board[rr][cc].piece;
-        if(!p || p.team !== team) continue;
-        const moves = legalMovesFor(p, rr, cc, S);
-        for(const m of moves){
-          if(m.r === r && m.c === c){
-            // ensure capture is allowed (we already filtered in legalMovesFor)
-            return true;
-          }
+  // Killer moves & history heuristic
+  const KILLER = {};
+  const HISTORY = {};
+
+  // Move ordering function (MVV-LVA, captures, killers, history)
+  function scoreMove(S, m){
+    let s = 0;
+    if(m.type === 'attack' && m.targetType) s += (PIECE_VALUES[m.targetType] || 0) * 1000;
+    // prefer captures of president
+    if(m.type === 'attack' && m.targetType === 'president') s += 100000000;
+    // killer
+    const key = S.turn + '|' + (m.from.r) + ',' + (m.from.c);
+    if(KILLER[key] && KILLER[key].r === m.to.r && KILLER[key].c === m.to.c) s += 50000;
+    // history
+    const histKey = (m.from.r)+','+(m.from.c)+'-'+(m.to.r)+','+(m.to.c);
+    s += (HISTORY[histKey] || 0);
+    // small proximity bias to opponent president
+    return s;
+  }
+
+  // Negamax with alpha-beta, iterative deepening, and quiescence
+  function negamax_root(S, maxDepth, maxTimeMs){
+    const perspective = S.turn;
+    const stopAt = Date.now() + maxTimeMs;
+    let bestMove = null;
+    let bestScore = -Infinity;
+
+    // immediate root check: any immediate president capture -> return
+    const rootMoves = generateMoves(S, S.turn);
+    for(const m of rootMoves){
+      if(m.type === 'attack' && m.targetType === 'president'){
+        postMessage({cmd:'log', msg: 'Immediate president capture found (root) — taking it.'});
+        return m;
+      }
+    }
+
+    // iterative deepening
+    for(let depth=1; depth<=maxDepth; depth++){
+      if(Date.now() > stopAt) break;
+      postMessage({cmd:'thinking', depth});
+      let alpha = -Infinity;
+      let beta = Infinity;
+      let bestThisDepth = null;
+      let bestThisScore = -Infinity;
+
+      // sort root moves initially by heuristic
+      rootMoves.sort((a,b)=> scoreMove(S,b) - scoreMove(S,a) );
+
+      for(const m of rootMoves){
+        if(Date.now() > stopAt) break;
+        const s2 = applyMove(S, m);
+        const val = -negamax(s2, depth-1, -Infinity, Infinity, perspective, stopAt);
+        if(val > bestThisScore){
+          bestThisScore = val;
+          bestThisDepth = m;
         }
       }
-    }
-    return false;
-  }
 
-  // check if after making 'move' (which may be a capture), the moved piece would be recaptured on that square by opponent
-  function wouldBeRecapturedAfter(S, move){
-    const s2 = applyMove(S, move);
-    // find destination coordinates
-    const tr = move.to.r, tc = move.to.c;
-    const opp = s2.turn; // after applyMove, turn has switched to opponent
-    const oppMoves = generateMoves(s2, opp);
-    for(const om of oppMoves){
-      if(om.to.r === tr && om.to.c === tc){
-        return true; // opponent can recapture
+      if(bestThisDepth){
+        bestMove = bestThisDepth;
+        bestScore = bestThisScore;
       }
     }
-    return false;
+
+    return bestMove;
   }
 
-  // negamax with timeout
+  // core negamax
   function negamax(S, depth, alpha, beta, perspective, stopAt){
-    if(Date.now() > stopAt) return evaluate(S,perspective);
-    if(S.winner) return (S.winner === perspective) ? 999999 : -999999;
-    if(depth <= 0) return evaluate(S,perspective);
+    if(Date.now() > stopAt) return evaluate(S, perspective);
+    if(S.winner) return S.winner === perspective ? 999999 : -999999;
+    if(depth <= 0){
+      return quiesce(S, alpha, beta, perspective, stopAt, TT);
+    }
+
+    // transposition lookup
     const key = JSON.stringify(S.board) + '|' + S.turn + '|' + depth;
-    const tt = TT.get(key); if(tt && tt.depth >= depth) return tt.score;
+    const tt = TT.get(key);
+    if(tt && tt.depth >= depth) return tt.score;
+
     let best = -Infinity;
-    const moves = generateMoves(S, S.turn);
-    // order moves heuristically by capture value (MVV-LVA style)
-    moves.sort((a,b)=>{
-      const ta = S.board[a.to.r][a.to.c].piece;
-      const tb = S.board[b.to.r][b.to.c].piece;
-      const va = ta ? (PIECE_VALUES[ta.type]||0) : 0;
-      const vb = tb ? (PIECE_VALUES[tb.type]||0) : 0;
-      return (vb - va);
-    });
+    let moves = generateMoves(S, S.turn);
+
+    // move ordering
+    moves.sort((a,b) => scoreMove(S,b) - scoreMove(S,a));
+
     for(const m of moves){
       if(Date.now() > stopAt) break;
+      // detect immediate president capture and return quickly
+      if(m.type === 'attack' && m.targetType === 'president'){
+        return 999990; // extremely large positive score for side to move
+      }
       const s2 = applyMove(S, m);
       const score = -negamax(s2, depth-1, -beta, -alpha, perspective, stopAt);
-      if(score>best) best=score;
-      if(score>alpha) alpha=score;
-      if(alpha>=beta) break;
+      if(score > best){
+        best = score;
+      }
+      if(best > alpha){
+        alpha = best;
+      }
+      if(alpha >= beta){
+        // store killer / history
+        const killerKey = S.turn + '|' + (m.from.r) + ',' + (m.from.c);
+        KILLER[killerKey] = {r:m.to.r, c:m.to.c};
+        const histKey = (m.from.r)+','+(m.from.c)+'-'+(m.to.r)+','+(m.to.c);
+        HISTORY[histKey] = (HISTORY[histKey] || 0) + (1 << depth);
+        break;
+      }
     }
-    TT.set(key,{depth,score:best});
+
+    TT.set(key, {depth, score:best});
     return best;
   }
 
-  // Main 'think' handler: search with additional heuristics so AI attacks more and prefers unprotected captures
+  // message handler
   self.onmessage = function(ev){
     const data = ev.data;
     if(!data) return;
     if(data.cmd === 'think'){
       const S = data.state;
-      const maxTime = data.maxTimeMs || 800;
-      const maxDepth = data.maxDepth || 4;
-      const perspective = S.turn; // AI's side to move
+      const maxTime = data.maxTimeMs || 1200;
+      const maxDepth = data.maxDepth || 5;
+      const rootPerspective = S.turn;
       const stopAt = Date.now() + maxTime;
-      let bestMove = null;
-      let bestScoreGlobal = -Infinity;
 
-      // aggression parameters (tune these)
-      const CAPTURE_BONUS = 200;       // base bonus for making a capture
-      const SAFE_CAPTURE_BONUS = 120;  // extra bonus if capture is not recapturable
-      const UNPROTECTED_TARGET_BONUS = 90; // additional boost if target is unprotected now
-
-      // get candidate moves once
+      // quick immediate root president capture check
       const rootMoves = generateMoves(S, S.turn);
-      if(rootMoves.length === 0){
-        postMessage({cmd:'best', move: null});
-        return;
+      for(const m of rootMoves){
+        if(m.type === 'attack' && m.targetType === 'president'){
+          postMessage({cmd:'best', move: m});
+          return;
+        }
       }
 
-      for(let depth=1; depth<=maxDepth; depth++){
-        postMessage({cmd:'thinking', depth});
-        let bestMoveAtDepth = null;
-        let bestScoreAtDepth = -Infinity;
+      // run iterative deepening
+      let bestMove = null;
+      try{
+        bestMove = negamax_root(S, maxDepth, maxTime);
+      }catch(e){
+        // if any error, fallback to a safe move
+        postMessage({cmd:'log', msg:'AI error, falling back: '+e.toString()});
+      }
 
-        // sort root moves with a heuristic that prefers attacks to unprotected/high-value targets
-        rootMoves.sort((a,b)=>{
-          const ta = S.board[a.to.r][a.to.c].piece;
-          const tb = S.board[b.to.r][b.to.c].piece;
-          const va = ta ? (PIECE_VALUES[ta.type]||0) : 0;
-          const vb = tb ? (PIECE_VALUES[tb.type]||0) : 0;
-          let scoreA = (a.type === 'attack') ? va : 0;
-          let scoreB = (b.type === 'attack') ? vb : 0;
-          // reward attacking unprotected targets now
-          if(a.type === 'attack'){
-            const unprotectedA = !isSquareDefended(S, a.to.r, a.to.c);
-            if(unprotectedA) scoreA += UNPROTECTED_TARGET_BONUS;
-          }
-          if(b.type === 'attack'){
-            const unprotectedB = !isSquareDefended(S, b.to.r, b.to.c);
-            if(unprotectedB) scoreB += UNPROTECTED_TARGET_BONUS;
-          }
-          return scoreB - scoreA;
-        });
-
-        for(const m of rootMoves){
-          if(Date.now() > stopAt) break;
-
-          // quick heuristic score for move desirability (before deep search)
-          let heuristic = 0;
-          if(m.type === 'attack'){
-            const targetVal = PIECE_VALUES[m.targetType] || 100;
-            heuristic += CAPTURE_BONUS + targetVal;
-            // if the destination is currently unprotected, favor it strongly
-            if(!isSquareDefended(S, m.to.r, m.to.c)) heuristic += UNPROTECTED_TARGET_BONUS;
-            // if capturing will NOT allow immediate recapture, award a safety bonus
-            if(!wouldBeRecapturedAfter(S, m)) heuristic += SAFE_CAPTURE_BONUS;
-            else heuristic -= 30; // discourage obviously losing trades
-          } else {
-            // for non-capture moves, small bias to move toward center / aggression
-            const centerDist = Math.abs(m.to.r - 3.5) + Math.abs(m.to.c - 3.5);
-            heuristic += Math.max(0, (3.5 - centerDist)) * 6;
-          }
-
-          // run search from resulting position
-          const s2 = applyMove(S, m);
-          const score = -negamax(s2, depth-1, -Infinity, Infinity, perspective, stopAt);
-
-          // combine deep score and heuristic (heuristic breaks ties and encourages aggression)
-          const combined = score + heuristic;
-
-          if(combined > bestScoreAtDepth){
-            bestScoreAtDepth = combined;
-            bestMoveAtDepth = m;
-          }
+      // fallback: if bestMove null pick a legal move by heuristic
+      if(!bestMove){
+        const cand = generateMoves(S, S.turn);
+        if(cand.length === 0){
+          postMessage({cmd:'best', move: null});
+          return;
         }
-
-        if(Date.now() > stopAt) break;
-        if(bestMoveAtDepth && bestScoreAtDepth > bestScoreGlobal){
-          bestScoreGlobal = bestScoreAtDepth;
-          bestMove = bestMoveAtDepth;
-        }
+        cand.sort((a,b)=> scoreMove(S,b) - scoreMove(S,a));
+        bestMove = cand[0];
       }
 
       postMessage({cmd:'best', move: bestMove});
     } else if(data.cmd === 'config'){
-      // optional difficulty / config feedback
       postMessage({cmd:'log', msg: 'AI configured: ' + (data.difficulty || 'normal')});
     }
   };
   `;
+
   const blob = new Blob([workerCode], { type: 'application/javascript' });
   const workerUrl = URL.createObjectURL(blob);
   return new Worker(workerUrl);
@@ -799,8 +881,7 @@ function createAIWorker(){
 /* Boot */
 state = symmetricalStart();
 render();
-logMessage('Ready — choose Play Blue or Play Red. Pieces match original visuals.');
-
+logMessage('Ready — choose Play Blue or Play Red. Advanced AI active (normal mode is stronger).');
 </script>
 </body>
 </html>
